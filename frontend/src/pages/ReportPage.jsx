@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import axios from 'axios';
 import LocationPickerMap from '../components/LocationPickerMap';
 
@@ -22,9 +22,13 @@ function ReportPage() {
   const [locationSuggestions, setLocationSuggestions] = useState([]);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
   const fileInputRef = useRef(null);
 
-  const issueTypes = [    { value: 'auto', label: '🤖 Auto-Detect (AI Analysis)' },    { value: 'road_damage', label: '🛣️ Road Damage (Pothole, Crack)' },
+  const issueTypes = [
+    { value: 'auto', label: '🤖 Auto-Detect (AI Analysis)' },
+    { value: 'road_damage', label: '🛣️ Road Damage (Pothole, Crack)' },
     { value: 'garbage', label: '🗑️ Garbage (Litter, Trash)' },
     { value: 'water_leak', label: '💧 Water Leak (Puddle, Drainage)' },
     { value: 'traffic', label: '🚗 Traffic Issue (Congestion, Signal)' },
@@ -33,15 +37,64 @@ function ReportPage() {
     { value: 'other', label: '📌 Other' }
   ];
 
+  // Enhanced form validation
+  const isWithinKangraDistrict = (lat, lng) => {
+    return lat >= 31.0 && lat <= 32.7 && lng >= 75.0 && lng <= 77.8;
+  };
+
+  const validateForm = useCallback(() => {
+    const errors = {};
+
+    if (!formData.title.trim()) {
+      errors.title = 'Title is required';
+    } else if (formData.title.length < 5) {
+      errors.title = 'Title must be at least 5 characters';
+    }
+
+    if (!image) {
+      errors.image = 'Please select an image';
+    } else if (image.size > 10 * 1024 * 1024) { // 10MB limit
+      errors.image = 'Image size must be less than 10MB';
+    }
+
+    if (!formData.latitude || !formData.longitude) {
+      errors.location = 'Please provide location coordinates';
+    } else {
+      const lat = parseFloat(formData.latitude);
+      const lng = parseFloat(formData.longitude);
+      if (Number.isNaN(lat) || lat < -90 || lat > 90) {
+        errors.location = 'Invalid latitude';
+      }
+      if (Number.isNaN(lng) || lng < -180 || lng > 180) {
+        errors.location = 'Invalid longitude';
+      }
+      if (!errors.location && !isWithinKangraDistrict(lat, lng)) {
+        errors.location = 'Location must be within Kangra district, Himachal Pradesh';
+      }
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, [formData, image]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+
+    // Clear validation error when user starts typing
+    if (validationErrors[name]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
   };
 
-  const handleLocationSearch = async (query) => {
+  // Enhanced location search with debouncing
+  const handleLocationSearch = useCallback(async (query) => {
     if (query.length < 3) {
       setLocationSuggestions([]);
       return;
@@ -52,32 +105,85 @@ function ReportPage() {
         params: {
           q: query,
           format: 'json',
-          limit: 5
+          limit: 5,
+          countrycodes: 'in',
+          viewbox: '75.0,32.7,77.8,31.0',
+          bounded: 1
         }
       });
-      setLocationSuggestions(response.data || []);
-      setShowLocationSuggestions(true);
+      const filtered = (response.data || []).filter((item) => {
+        const lat = parseFloat(item.lat);
+        const lon = parseFloat(item.lon);
+        return !Number.isNaN(lat) && !Number.isNaN(lon) && isWithinKangraDistrict(lat, lon);
+      });
+      setLocationSuggestions(filtered);
+      setShowLocationSuggestions(filtered.length > 0);
     } catch (err) {
       console.error('Error fetching location suggestions:', err);
       setLocationSuggestions([]);
     }
-  };
+  }, []);
 
   const handleLocationSelect = (suggestion) => {
+    const lat = parseFloat(suggestion.lat);
+    const lng = parseFloat(suggestion.lon);
+    if (!isWithinKangraDistrict(lat, lng)) {
+      setError('Selected location must be within Kangra district, Himachal Pradesh.');
+      setValidationErrors(prev => ({ ...prev, location: 'Location must be within Kangra district' }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
-      latitude: parseFloat(suggestion.lat),
-      longitude: parseFloat(suggestion.lon),
+      latitude: lat,
+      longitude: lng,
       location_description: suggestion.display_name
     }));
     setShowLocationSuggestions(false);
     setLocationSuggestions([]);
+    setValidationErrors(prev => ({ ...prev, location: '' }));
+    setError('');
   };
+
+  // Enhanced image handling with drag & drop
+  const handleDrag = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleImageSelect({ target: { files: e.dataTransfer.files } });
+    }
+  }, []);
 
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setValidationErrors(prev => ({ ...prev, image: 'Please select a valid image file' }));
+        return;
+      }
+
+      // Validate file size
+      if (file.size > 10 * 1024 * 1024) {
+        setValidationErrors(prev => ({ ...prev, image: 'Image size must be less than 10MB' }));
+        return;
+      }
+
       setImage(file);
+      setValidationErrors(prev => ({ ...prev, image: '' }));
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result);
@@ -88,18 +194,48 @@ function ReportPage() {
 
   const handleGetLocation = () => {
     if (navigator.geolocation) {
+      setLoading(true);
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          const lat = parseFloat(position.coords.latitude.toFixed(6));
+          const lng = parseFloat(position.coords.longitude.toFixed(6));
+
+          if (!isWithinKangraDistrict(lat, lng)) {
+            setError('Your current location is outside Kangra district, Himachal Pradesh. Please choose a local point on the map or enter valid coordinates within the district.');
+            setValidationErrors(prev => ({ ...prev, location: 'Location must be within Kangra district' }));
+            setLoading(false);
+            return;
+          }
+
           setFormData(prev => ({
             ...prev,
-            latitude: position.coords.latitude.toFixed(6),
-            longitude: position.coords.longitude.toFixed(6)
+            latitude: lat,
+            longitude: lng
           }));
+          setValidationErrors(prev => ({ ...prev, location: '' }));
+          setError('');
+          setLoading(false);
         },
-        () => {
-          setError('Unable to get your location. Please enable location services.');
-        }
+        (error) => {
+          let errorMessage = 'Unable to get your location.';
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Location access denied. Please enable location services.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Location information is unavailable.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Location request timed out.';
+              break;
+          }
+          setError(errorMessage);
+          setLoading(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
       );
+    } else {
+      setError('Geolocation is not supported by this browser.');
     }
   };
 
@@ -107,20 +243,11 @@ function ReportPage() {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setValidationErrors({});
 
-    // Validation
-    if (!image) {
-      setError('Please select an image');
-      return;
-    }
-
-    if (!formData.title.trim()) {
-      setError('Please enter a title');
-      return;
-    }
-
-    if (!formData.latitude || !formData.longitude) {
-      setError('Please provide location coordinates');
+    // Validate form
+    if (!validateForm()) {
+      setError('Please fix the errors below and try again.');
       return;
     }
 
@@ -129,11 +256,11 @@ function ReportPage() {
     try {
       const form = new FormData();
       form.append('file', image);
-      form.append('title', formData.title);
-      form.append('description', formData.description);
+      form.append('title', formData.title.trim());
+      form.append('description', formData.description.trim());
       form.append('latitude', parseFloat(formData.latitude));
       form.append('longitude', parseFloat(formData.longitude));
-      form.append('location_description', formData.location_description);
+      form.append('location_description', formData.location_description.trim());
       form.append('issue_type', formData.issue_type);
 
       console.log('Submitting form data:', {
@@ -141,22 +268,27 @@ function ReportPage() {
         latitude: parseFloat(formData.latitude),
         longitude: parseFloat(formData.longitude),
         description: formData.description,
-        location_description: formData.location_description
+        location_description: formData.location_description,
+        issue_type: formData.issue_type
       });
 
       const response = await axios.post('/api/issues/upload', form, {
         headers: {
           'Content-Type': 'multipart/form-data'
+        },
+        timeout: 30000, // 30 second timeout
+        onUploadProgress: (progressEvent) => {
+          // Could add upload progress here if needed
         }
       });
 
       setAiResult(response.data);
-      const confidenceText = response.data.ai_confidence > 0.3 ? 
-        ` | 🎯 Detected: ${response.data.issue_type} (${(response.data.ai_confidence * 100).toFixed(0)}% confident)` : 
+      const confidenceText = response.data.ai_confidence > 0.3 ?
+        ` | 🎯 Detected: ${response.data.issue_type} (${(response.data.ai_confidence * 100).toFixed(0)}% confident)` :
         '';
       setSuccess(`✓ Issue reported successfully! ID: ${response.data.id}${confidenceText}`);
 
-      // Reset form (keep issue_type as 'auto' - don't change until user manually selects)
+      // Reset form after success
       setTimeout(() => {
         setFormData({
           title: '',
@@ -169,12 +301,21 @@ function ReportPage() {
         setImage(null);
         setPreview(null);
         setAiResult(null);
+        setValidationErrors({});
         if (fileInputRef.current) fileInputRef.current.value = '';
-      }, 2000);
+      }, 3000);
     } catch (err) {
-      console.error('Error submitting issue:', err.response?.data || err.message);
-      let errorMessage = 'Error submitting issue';
-      if (err.response?.data?.detail) {
+      console.error('Error submitting issue:', err);
+
+      let errorMessage = 'Error submitting issue. Please try again.';
+
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (err.response?.status === 413) {
+        errorMessage = 'Image file is too large. Please choose a smaller image.';
+      } else if (err.response?.status === 415) {
+        errorMessage = 'Invalid file type. Please upload a valid image.';
+      } else if (err.response?.data?.detail) {
         if (Array.isArray(err.response.data.detail)) {
           errorMessage = err.response.data.detail.map(e => e.msg || e.message || JSON.stringify(e)).join('; ');
         } else if (typeof err.response.data.detail === 'string') {
@@ -183,6 +324,7 @@ function ReportPage() {
           errorMessage = JSON.stringify(err.response.data.detail);
         }
       }
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -211,8 +353,10 @@ function ReportPage() {
               value={formData.title}
               onChange={handleInputChange}
               placeholder="e.g., Large pothole on Main Street"
+              className={validationErrors.title ? 'error' : ''}
               required
             />
+            {validationErrors.title && <span className="error-text">{validationErrors.title}</span>}
           </div>
 
           {/* Description */}
@@ -224,27 +368,57 @@ function ReportPage() {
               value={formData.description}
               onChange={handleInputChange}
               placeholder="Provide additional details about the issue..."
+              rows="3"
             />
           </div>
 
-          {/* Image Upload */}
+          {/* Enhanced Image Upload with Drag & Drop */}
           <div className="form-group">
             <label htmlFor="image">Upload Image *</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              id="image"
-              accept="image/*"
-              onChange={handleImageSelect}
-              required
-            />
-          </div>
+            <div
+              className={`image-upload-area ${dragActive ? 'drag-active' : ''} ${validationErrors.image ? 'error' : ''}`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                id="image"
+                accept="image/*"
+                onChange={handleImageSelect}
+                style={{ display: 'none' }}
+                required
+              />
 
-          {preview && (
-            <div className="image-preview">
-              <img src={preview} alt="Preview" />
+              {preview ? (
+                <div className="image-preview">
+                  <img src={preview} alt="Preview" />
+                  <button
+                    type="button"
+                    className="remove-image-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImage(null);
+                      setPreview(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="upload-placeholder">
+                  <div className="upload-icon">📷</div>
+                  <p>Click to select or drag & drop an image</p>
+                  <small>Supported formats: JPG, PNG, GIF (max 10MB)</small>
+                </div>
+              )}
             </div>
-          )}
+            {validationErrors.image && <span className="error-text">{validationErrors.image}</span>}
+          </div>
 
           {/* Issue Type Selector */}
           <div className="form-group">
@@ -269,7 +443,7 @@ function ReportPage() {
 
           {/* Location */}
           <div className="form-group">
-            <label>📍 Location</label>
+            <label>📍 Location (Kangra district, Himachal Pradesh only)</label>
             <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
               <button
                 type="button"

@@ -19,7 +19,7 @@ class User(UserBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class IssueBase(BaseModel):
@@ -55,7 +55,7 @@ class Issue(IssueBase):
     resolved_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class IssueList(BaseModel):
@@ -75,7 +75,7 @@ class IssueList(BaseModel):
     street_address: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class IssueUpdateResponse(BaseModel):
@@ -85,7 +85,7 @@ class IssueUpdateResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class IssueDetailResponse(BaseModel):
@@ -111,7 +111,7 @@ class IssueDetailResponse(BaseModel):
     reporter: Optional[User] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class AnalyticsResponse(BaseModel):

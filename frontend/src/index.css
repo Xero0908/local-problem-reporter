@@ -281,9 +281,51 @@ body {
   color: #333;
 }
 
-.image-preview {
-  margin: 1rem 0;
+/* Enhanced Image Upload */
+.image-upload-area {
+  border: 2px dashed #ddd;
+  border-radius: 8px;
+  padding: 2rem;
   text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #fafafa;
+}
+
+.image-upload-area:hover,
+.image-upload-area.drag-active {
+  border-color: #667eea;
+  background: #f0f4ff;
+}
+
+.image-upload-area.error {
+  border-color: #e74c3c;
+  background: #fef2f2;
+}
+
+.upload-placeholder {
+  color: #666;
+}
+
+.upload-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.upload-placeholder p {
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.upload-placeholder small {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.image-preview {
+  position: relative;
+  display: inline-block;
+  margin: 1rem 0;
 }
 
 .image-preview img {
@@ -291,6 +333,43 @@ body {
   max-height: 300px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.remove-image-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.remove-image-btn:hover {
+  background: #c0392b;
+}
+
+/* Form Validation */
+.form-group input.error,
+.form-group textarea.error,
+.image-upload-area.error {
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+}
+
+.error-text {
+  color: #e74c3c;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+  display: block;
 }
 
 .ai-detection-result {

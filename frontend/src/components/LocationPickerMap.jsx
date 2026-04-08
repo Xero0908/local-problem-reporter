@@ -11,14 +11,31 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
+const kangraBounds = {
+  south: 31.0,
+  north: 32.7,
+  west: 75.0,
+  east: 77.8
+};
+
+const isWithinKangra = (lat, lng) => {
+  return lat >= kangraBounds.south && lat <= kangraBounds.north &&
+         lng >= kangraBounds.west && lng <= kangraBounds.east;
+};
+
 const LocationMarker = ({ onLocationSelect, selectedLocation }) => {
   useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng;
-      onLocationSelect({
-        latitude: lat.toFixed(6),
-        longitude: lng.toFixed(6)
-      });
+      const location = {
+        latitude: parseFloat(lat.toFixed(6)),
+        longitude: parseFloat(lng.toFixed(6))
+      };
+      if (!isWithinKangra(location.latitude, location.longitude)) {
+        alert('Please select a location within Kangra district, Himachal Pradesh.');
+        return;
+      }
+      onLocationSelect(location);
     },
   });
 
@@ -39,7 +56,7 @@ const LocationMarker = ({ onLocationSelect, selectedLocation }) => {
 
 const LocationPickerMap = ({ onSelect, initialLocation, searchQuery }) => {
   const [selectedLocation, setSelectedLocation] = useState(initialLocation || null);
-  const [center, setCenter] = useState([40.7128, -74.0060]); // Default: New York
+  const [center, setCenter] = useState([32.1933, 76.2633]); // Center on Kangra district, Himachal Pradesh
   const [mapKey, setMapKey] = useState(0);
 
   // Update center when searchQuery changes (user types location)
@@ -49,14 +66,21 @@ const LocationPickerMap = ({ onSelect, initialLocation, searchQuery }) => {
       const geocodeLocation = async () => {
         try {
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=5&countrycodes=in&viewbox=75.0,32.7,77.8,31.0&bounded=1`
           );
           const data = await response.json();
           if (data && data.length > 0) {
-            const lat = parseFloat(data[0].lat);
-            const lon = parseFloat(data[0].lon);
-            setCenter([lat, lon]);
-            setMapKey(prev => prev + 1); // Force map re-render to center on new location
+            const validResult = data.find((item) => {
+              const lat = parseFloat(item.lat);
+              const lon = parseFloat(item.lon);
+              return !Number.isNaN(lat) && !Number.isNaN(lon) && isWithinKangra(lat, lon);
+            });
+            if (validResult) {
+              const lat = parseFloat(validResult.lat);
+              const lon = parseFloat(validResult.lon);
+              setCenter([lat, lon]);
+              setMapKey(prev => prev + 1); // Force map re-render to center on new location
+            }
           }
         } catch (err) {
           console.log('Geocoding error:', err);
@@ -72,11 +96,15 @@ const LocationPickerMap = ({ onSelect, initialLocation, searchQuery }) => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          setCenter([latitude, longitude]);
-          setSelectedLocation({
-            latitude: latitude.toFixed(6),
-            longitude: longitude.toFixed(6)
-          });
+          if (isWithinKangra(latitude, longitude)) {
+            setCenter([latitude, longitude]);
+            setSelectedLocation({
+              latitude: parseFloat(latitude.toFixed(6)),
+              longitude: parseFloat(longitude.toFixed(6))
+            });
+          } else {
+            console.log('Geolocation outside Kangra district, keeping default map center.');
+          }
         },
         (error) => {
           console.log('Geolocation error:', error);
@@ -96,7 +124,9 @@ const LocationPickerMap = ({ onSelect, initialLocation, searchQuery }) => {
       <MapContainer
         key={mapKey}
         center={center}
-        zoom={13}
+        zoom={12}
+        maxBounds={[[kangraBounds.south, kangraBounds.west], [kangraBounds.north, kangraBounds.east]]}
+        maxBoundsViscosity={1}
         style={{ height: '350px', width: '100%' }}
       >
         <TileLayer
