@@ -16,9 +16,9 @@ cors_origins = [origin.strip() for origin in cors_origins]
 # Create tables (with error handling for production)
 try:
     Base.metadata.create_all(bind=engine)
-    print("✓ Database tables created successfully")
+    print("[OK] Database tables created successfully")
 except Exception as e:
-    print(f"⚠️  Could not create database tables on startup: {str(e)}")
+    print(f"[WARNING] Could not create database tables on startup: {str(e)}")
     print("Tables will be created automatically when first accessed")
 
 # Create sample authority user on startup (with error handling)

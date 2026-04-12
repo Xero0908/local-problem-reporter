@@ -75,18 +75,18 @@ async def upload_issue(
                     # AI found something - use it
                     issue_type = detected_issue_type
                     priority_type_for_scoring = detected_issue_type
-                print(f"✓ AI detected: {issue_type} (confidence: {confidence:.2f})")
+                print(f"[AI] Detected: {issue_type} (confidence: {confidence:.2f})")
             else:
                 # AI has low confidence - keep "other" but report actual AI confidence
                 issue_type = "other"
                 priority_type_for_scoring = "other"
                 confidence = max(confidence, 0.3)
-                print(f"✓ AI confidence {confidence:.2f}, using 'other' type")
+                print(f"[AI] Confidence {confidence:.2f}, using 'other' type")
         elif issue_type != "other":
             # User selected a specific type - use that with high confidence
             confidence = 0.95
             priority_type_for_scoring = issue_type
-            print(f"✓ User selected: {issue_type}")
+            print(f"[USER] Selected: {issue_type}")
         else:
             # User selected "other" - try AI but keep as "other" if fails
             detector = get_detector()
@@ -97,18 +97,18 @@ async def upload_issue(
                     issue_type = detected_issue_type
                 priority_type_for_scoring = detected_issue_type
                 confidence = detected_conf
-                print(f"✓ AI detected with high confidence: {issue_type} ({confidence:.2%})")
+                print(f"[AI] High confidence: {issue_type} ({confidence:.2%})")
             elif detected_conf > 0.5:
                 # AI found something with medium confidence - use detected type for priority only
                 priority_type_for_scoring = detected_issue_type
                 confidence = detected_conf
-                print(f"✓ AI detected: {issue_type} (confidence: {confidence:.2f}, using for priority)")
+                print(f"[AI] Detected: {issue_type} (confidence: {confidence:.2f}, using for priority)")
             else:
                 # Keep as "other" 
                 priority_type_for_scoring = "other"
                 confidence = max(detected_conf, 0.3)
                 detected_objects = []
-                print(f"✓ Keeping as 'other' type with AI confidence {confidence:.2f}")
+                print(f"[AI] Low confidence {confidence:.2f}, using 'other' type")
         
         # Calculate priority score using the appropriate issue type
         priority_score, priority_level = PriorityScorer.calculate_priority_score(
@@ -167,14 +167,18 @@ async def get_all_issues(
     priority: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     issue_type: Optional[str] = Query(None),
-    skip: int = Query(0),
-    limit: int = Query(50)
+    search: Optional[str] = Query(None),
+    sort_by: str = Query("created_at"),
+    sort_order: str = Query("desc"),
+    page: int = Query(1),
+    per_page: int = Query(12)
 ):
     """
-    Get all issues with optional filtering
+    Get all issues with optional filtering, searching, and sorting
     """
     query = db.query(Issue)
     
+    # Apply filters
     if priority:
         query = query.filter(Issue.priority_level == priority)
     if status:
@@ -182,27 +186,68 @@ async def get_all_issues(
     if issue_type:
         query = query.filter(Issue.issue_type == issue_type)
     
-    issues = query.order_by(Issue.priority_score.desc(), Issue.created_at.desc()).offset(skip).limit(limit).all()
-    
-    return [
-        IssueList(
-            id=i.id,
-            title=i.title,
-            issue_type=i.issue_type,
-            image_path=i.image_path,
-            priority_level=i.priority_level,
-            priority_score=i.priority_score,
-            status=i.status,
-            created_at=i.created_at,
-            upvotes=i.upvotes,
-            satisfaction_votes=i.satisfaction_votes,
-            latitude=i.latitude,
-            longitude=i.longitude,
-            location_description=i.location_description,
-            street_address=i.street_address
+    # Apply search filter (search across title, description, location)
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.filter(
+            (Issue.title.ilike(search_pattern)) |
+            (Issue.description.ilike(search_pattern)) |
+            (Issue.location_description.ilike(search_pattern)) |
+            (Issue.street_address.ilike(search_pattern))
         )
-        for i in issues
-    ]
+    
+    # Get total count before pagination
+    total_issues = query.count()
+    
+    # Apply sorting
+    sort_column = None
+    if sort_by == "created_at":
+        sort_column = Issue.created_at
+    elif sort_by == "priority_score":
+        sort_column = Issue.priority_score
+    elif sort_by == "upvotes":
+        sort_column = Issue.upvotes
+    elif sort_by == "title":
+        sort_column = Issue.title
+    else:
+        sort_column = Issue.created_at
+    
+    if sort_order.lower() == "asc":
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+    
+    # Apply pagination
+    skip = (page - 1) * per_page
+    issues = query.offset(skip).limit(per_page).all()
+    
+    total_pages = (total_issues + per_page - 1) // per_page
+    
+    return {
+        "issues": [
+            IssueList(
+                id=i.id,
+                title=i.title,
+                issue_type=i.issue_type,
+                image_path=i.image_path,
+                priority_level=i.priority_level,
+                priority_score=i.priority_score,
+                status=i.status,
+                created_at=i.created_at,
+                upvotes=i.upvotes,
+                satisfaction_votes=i.satisfaction_votes,
+                latitude=i.latitude,
+                longitude=i.longitude,
+                location_description=i.location_description,
+                street_address=i.street_address
+            )
+            for i in issues
+        ],
+        "total_issues": total_issues,
+        "total_pages": total_pages,
+        "current_page": page,
+        "per_page": per_page
+    }
 
 
 @router.get("/{issue_id}")
