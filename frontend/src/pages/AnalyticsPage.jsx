@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 
@@ -17,8 +17,8 @@ function AnalyticsPage() {
     try {
       setLoading(true);
       const [statsRes, resRes] = await Promise.all([
-        axios.get('/api/analytics/stats/by-type'),
-        axios.get('/api/analytics/stats/resolution-rate')
+        api.get('/api/analytics/stats/by-type'),
+        api.get('/api/analytics/stats/resolution-rate')
       ]);
 
       setStatsData(statsRes.data);
@@ -206,11 +206,7 @@ function AnalyticsPage() {
         </a>
       </div>
 
-      <style jsx>{`
-        .data-table {
-          margin-top: 1.5rem;
-        }
-      `}</style>
+      {/* Using plain CSS classes instead of styled-jsx (unsupported here) */}
     </div>
   );
 }

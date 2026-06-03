@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
+from pydantic import BaseModel
 import json
 import os
 from datetime import datetime, timedelta
@@ -12,9 +13,17 @@ from ..schemas import (
     IssueList, IssueDetailResponse, Issue as IssueSchema, IssueCreate, IssueUpdate as IssueUpdateSchema
 )
 from ..services import AIIssueDetector, PriorityScorer
+from ..services.auth import decode_access_token
 from ..services.geocoding import GeocodingService
+from ..services.advanced_ai import DuplicateDetector, FakeReportDetector, GamificationEngine
+import uuid
 
 router = APIRouter(prefix="/api/issues", tags=["issues"])
+
+# Request models for duplicate management
+class ConfirmDuplicatesRequest(BaseModel):
+    duplicate_group_id: str
+    issue_ids_to_delete: List[int]
 
 # Initialize AI detector (lazy initialization)
 detector = None
@@ -40,7 +49,7 @@ async def upload_issue(
     longitude: float = Form(...),
     location_description: str = Form(default=""),
     issue_type: str = Form(default="other"),  # User can manually select
-    reporter_id: int = Form(default=1),  # In production, would use authentication
+    token: str = Form(...),
     db: Session = Depends(get_db)
 ):
     """
@@ -50,6 +59,12 @@ async def upload_issue(
     - Stores in database
     """
     try:
+        # Decode token to get user
+        payload = decode_access_token(token)
+        if not payload:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        reporter_id = int(payload.get("sub"))
+
         # Create uploads directory if not exists
         os.makedirs("uploads", exist_ok=True)
         
@@ -118,6 +133,108 @@ async def upload_issue(
             status="reported"
         )
         
+        # DUPLICATE DETECTION
+        duplicate_detector = DuplicateDetector()
+        fake_detector = FakeReportDetector()
+        gamification = GamificationEngine()
+        
+        # Get existing issues for duplicate detection
+        existing_issues = db.query(Issue).filter(
+            Issue.created_at > datetime.utcnow() - timedelta(days=30)
+        ).all()
+        
+        existing_issues_data = [{
+            'id': i.id,
+            'latitude': i.latitude,
+            'longitude': i.longitude,
+            'issue_type': i.issue_type,
+            'image_path': i.image_path.replace('/uploads/', 'uploads/') if i.image_path else None,  # Convert URL path to file path
+            'created_at': i.created_at
+        } for i in existing_issues]
+        
+        new_issue_data = {
+            'latitude': latitude,
+            'longitude': longitude,
+            'issue_type': issue_type,
+            'image_path': file_path,
+            'created_at': datetime.utcnow()
+        }
+        
+        # Check for duplicates
+        duplicates = duplicate_detector.find_duplicates(new_issue_data, existing_issues_data)
+        
+        # FAKE REPORT DETECTION
+        user = db.query(User).filter(User.id == reporter_id).first()
+        user_history = [{
+            'latitude': i.latitude,
+            'longitude': i.longitude,
+            'description': i.description,
+            'image_path': i.image_path,
+            'created_at': i.created_at
+        } for i in user.issues[-20:]] if user else []  # Last 20 reports
+        
+        report_data = {
+            'description': description,
+            'latitude': latitude,
+            'longitude': longitude,
+            'image_path': file_path
+        }
+        
+        is_fake, risk_score, fake_reason = fake_detector.analyze_report(report_data, user_history)
+        
+        # Handle duplicates
+        duplicate_group_id = None
+        is_duplicate = False
+        duplicate_count = 1
+        
+        if duplicates:
+            # Merge with most similar duplicate
+            best_duplicate = max(duplicates, key=lambda x: x['similarity'])
+            duplicate_issue = db.query(Issue).filter(Issue.id == best_duplicate['issue']['id']).first()
+            
+            if duplicate_issue:
+                # Update existing issue
+                duplicate_issue.duplicate_count += 1
+                duplicate_issue.priority_level = "critical"  # Upgrade to critical
+                duplicate_issue.priority_score = max(duplicate_issue.priority_score, priority_score + 20)
+                duplicate_group_id = duplicate_issue.duplicate_group_id or str(uuid.uuid4())
+                duplicate_issue.duplicate_group_id = duplicate_group_id
+                
+                # Mark this as duplicate
+                is_duplicate = True
+                duplicate_count = duplicate_issue.duplicate_count
+                
+                print(f"[DUPLICATE] Merged with issue {duplicate_issue.id}, count now {duplicate_count}")
+        
+        # GAMIFICATION
+        if user:
+            # Award points based on report quality
+            if is_fake:
+                points = gamification.award_points(user.__dict__, 'fake_report')
+                user.fake_reports += 1
+                print(f"[GAMIFICATION] Fake report detected: {fake_reason}, {points} points deducted")
+            elif is_duplicate:
+                points = gamification.award_points(user.__dict__, 'duplicate_report')
+                user.civic_points += points
+                user.total_reports += 1
+                print(f"[GAMIFICATION] Duplicate report: +{points} points")
+            else:
+                points = gamification.award_points(user.__dict__, 'valid_report')
+                user.civic_points += points
+                user.total_reports += 1
+                user.valid_reports += 1
+                user.reputation_score = min(1.0, user.reputation_score + 0.05)  # Increase reputation
+                
+                # Check for new badges
+                new_badges = gamification.check_badges(user.__dict__)
+                if new_badges:
+                    current_badges = json.loads(user.badges or '[]')
+                    current_badges.extend(new_badges)
+                    user.badges = json.dumps(list(set(current_badges)))  # Remove duplicates
+                    print(f"[GAMIFICATION] New badges earned: {new_badges}")
+                
+                print(f"[GAMIFICATION] Valid report: +{points} points, reputation: {user.reputation_score:.2f}")
+        
         # Create issue record
         db_issue = Issue(
             reporter_id=reporter_id,
@@ -132,7 +249,10 @@ async def upload_issue(
             priority_level=priority_level,
             ai_confidence=confidence,
             ai_detected_objects=json.dumps(detected_objects),
-            status="reported"
+            status="reported",
+            duplicate_group_id=duplicate_group_id,
+            is_duplicate=is_duplicate,
+            duplicate_count=duplicate_count
         )
         
         db.add(db_issue)
@@ -155,7 +275,10 @@ async def upload_issue(
             "location_description": db_issue.location_description,
             "upvotes": db_issue.upvotes,
             "created_at": db_issue.created_at,
-            "resolved_at": db_issue.resolved_at
+            "resolved_at": db_issue.resolved_at,
+            "is_duplicate": db_issue.is_duplicate,
+            "duplicate_group_id": db_issue.duplicate_group_id,
+            "duplicate_count": db_issue.duplicate_count
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing issue: {str(e)}")
@@ -239,7 +362,10 @@ async def get_all_issues(
                 latitude=i.latitude,
                 longitude=i.longitude,
                 location_description=i.location_description,
-                street_address=i.street_address
+                street_address=i.street_address,
+                is_duplicate=i.is_duplicate,
+                duplicate_count=i.duplicate_count,
+                duplicate_group_id=i.duplicate_group_id
             )
             for i in issues
         ],
@@ -248,6 +374,106 @@ async def get_all_issues(
         "current_page": page,
         "per_page": per_page
     }
+
+
+@router.get("/duplicates")
+async def get_duplicate_groups(token: str = Query(...), db: Session = Depends(get_db)):
+    """Get duplicate issue groups for authority review"""
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    if not payload.get("is_authority", False):
+        raise HTTPException(status_code=403, detail="User is not an authority")
+
+    duplicate_issues = db.query(Issue).filter(Issue.duplicate_group_id != None).all()
+    groups = {}
+    for issue in duplicate_issues:
+        if not issue.duplicate_group_id:
+            continue
+        if issue.duplicate_group_id not in groups:
+            groups[issue.duplicate_group_id] = []
+        groups[issue.duplicate_group_id].append(issue)
+
+    duplicate_groups = []
+    for group_id, issues in groups.items():
+        duplicate_groups.append({
+            "duplicate_group_id": group_id,
+            "issues": [
+                {
+                    "id": i.id,
+                    "title": i.title,
+                    "description": i.description,
+                    "issue_type": i.issue_type,
+                    "image_path": i.image_path,
+                    "priority_level": i.priority_level,
+                    "priority_score": i.priority_score,
+                    "status": i.status,
+                    "created_at": i.created_at,
+                    "upvotes": i.upvotes,
+                    "satisfaction_votes": i.satisfaction_votes,
+                    "latitude": i.latitude,
+                    "longitude": i.longitude,
+                    "location_description": i.location_description,
+                    "street_address": i.street_address,
+                    "is_duplicate": i.is_duplicate,
+                    "duplicate_count": i.duplicate_count,
+                    "duplicate_group_id": i.duplicate_group_id
+                }
+                for i in issues
+            ]
+        })
+
+    return {"duplicate_groups": duplicate_groups}
+
+
+@router.post("/confirm-duplicates")
+async def confirm_duplicate_group(
+    body: ConfirmDuplicatesRequest,
+    token: str = Query(...),
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Delete duplicate issues from a duplicate group"""
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    if not payload.get("is_authority", False):
+        raise HTTPException(status_code=403, detail="User is not an authority")
+
+    auth_user_id = int(payload.get("sub"))
+    if auth_user_id != user_id:
+        raise HTTPException(status_code=403, detail="User ID mismatch")
+
+    if not body.duplicate_group_id:
+        raise HTTPException(status_code=400, detail="duplicate_group_id is required")
+
+    if not body.issue_ids_to_delete:
+        raise HTTPException(status_code=400, detail="issue_ids_to_delete must contain at least one issue id to delete")
+
+    issues = db.query(Issue).filter(Issue.duplicate_group_id == body.duplicate_group_id).all()
+    if not issues:
+        raise HTTPException(status_code=404, detail="Duplicate group not found")
+
+    delete_issues = [i for i in issues if i.id in body.issue_ids_to_delete]
+    if not delete_issues:
+        raise HTTPException(status_code=400, detail="No matching duplicate issues found for deletion")
+
+    for issue in delete_issues:
+        db.delete(issue)
+
+    remaining_issues = [i for i in issues if i.id not in body.issue_ids_to_delete]
+    if len(remaining_issues) == 1:
+        remaining_issues[0].duplicate_group_id = None
+        remaining_issues[0].duplicate_count = 1
+    elif len(remaining_issues) > 1:
+        for issue in remaining_issues:
+            issue.duplicate_count = len(remaining_issues)
+
+    db.commit()
+
+    return {"message": f"Deleted {len(delete_issues)} duplicate issue(s) successfully."}
 
 
 @router.get("/{issue_id}")
@@ -525,7 +751,7 @@ async def delete_issue(
     token: str = Query(...),
     db: Session = Depends(get_db)
 ):
-    """Delete a resolved issue (authority only, requires 5+ upvotes)"""
+    """Delete a resolved issue (authority only, requires 5+ upvotes) or duplicate issue"""
     from ..services.auth import decode_access_token
     
     # Verify token
@@ -543,19 +769,147 @@ async def delete_issue(
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
     
-    # Check if issue is resolved
-    if issue.status != "resolved":
-        raise HTTPException(status_code=400, detail="Only resolved issues can be deleted")
+    # Check if issue can be deleted (resolved with 5+ upvotes OR duplicate)
+    can_delete = False
+    delete_reason = ""
     
-    # Check if issue has at least 5 upvotes
-    if issue.upvotes < 5:
+    if issue.status == "resolved" and issue.upvotes >= 5:
+        can_delete = True
+        delete_reason = "resolved issue with sufficient upvotes"
+    elif issue.is_duplicate:
+        can_delete = True
+        delete_reason = "duplicate issue"
+    
+    if not can_delete:
         raise HTTPException(
             status_code=400, 
-            detail=f"Issue needs at least 5 upvotes to be deleted (current: {issue.upvotes})"
+            detail="Issue cannot be deleted. Only resolved issues with 5+ upvotes or duplicate issues can be deleted."
         )
     
     # Delete the issue
     db.delete(issue)
     db.commit()
     
-    return {"message": "Issue deleted successfully", "issue_id": issue_id}
+    return {"message": f"Issue deleted successfully ({delete_reason})", "issue_id": issue_id}
+
+
+@router.post("/{issue_id}/complete")
+async def mark_issue_complete(
+    issue_id: int,
+    completion_photo: UploadFile = File(...),
+    notes: str = Form(""),
+    token: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Mark an issue as complete with AI verification
+    - Upload completion photo
+    - AI compares with original issue photo
+    - Auto-approve or reject based on verification
+    """
+    from ..services.auth import decode_access_token
+
+    # Verify token
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Check if user is authority
+    is_authority = payload.get("is_authority", False)
+    if not is_authority:
+        raise HTTPException(status_code=403, detail="Only authorities can mark issues complete")
+
+    issue = db.query(Issue).filter(Issue.id == issue_id).first()
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    if issue.status == "resolved":
+        raise HTTPException(status_code=400, detail="Issue is already resolved")
+
+    try:
+        # Save completion photo
+        os.makedirs("uploads/completions", exist_ok=True)
+        completion_filename = f"completion_{issue_id}_{completion_photo.filename}"
+        completion_path = f"uploads/completions/{completion_filename}"
+        url_path = f"/uploads/completions/{completion_filename}"
+
+        with open(completion_path, "wb") as f:
+            f.write(await completion_photo.read())
+
+        # AI Verification
+        verifier = CompletionVerifier()
+        original_path = issue.image_path.replace("/uploads/", "uploads/")  # Convert URL to file path
+
+        is_complete, confidence, verification_notes = verifier.verify_completion(
+            original_path, completion_path
+        )
+
+        # Determine verification result
+        if is_complete and confidence >= 0.8:
+            verification_result = "approved"
+            new_status = "resolved"
+            issue.resolved_at = datetime.utcnow()
+            issue.completion_verified = True
+            issue.completion_confidence = confidence
+            issue.completion_notes = verification_notes
+        elif confidence >= 0.5:
+            verification_result = "pending"
+            new_status = "investigating"  # Needs manual review
+            issue.completion_notes = f"AI verification inconclusive: {verification_notes}"
+        else:
+            verification_result = "rejected"
+            new_status = "investigating"  # Send back for rework
+            issue.completion_notes = f"AI verification failed: {verification_notes}"
+
+        # Update issue status
+        old_status = issue.status
+        issue.status = new_status
+
+        # Add update record with completion photo
+        update = IssueUpdate(
+            issue_id=issue_id,
+            authority_id=int(payload.get("sub")),
+            status_update=f"{old_status} → {new_status} (AI verification: {verification_result})",
+            notes=f"{notes}\n\nAI Verification Result: {verification_result.upper()}\nConfidence: {confidence:.2f}\n{verification_notes}",
+            completion_photo_path=url_path,
+            verification_result=verification_result,
+            verification_confidence=confidence
+        )
+
+        db.add(update)
+        db.commit()
+        db.refresh(issue)
+
+        return {
+            "status": issue.status,
+            "verification_result": verification_result,
+            "confidence": confidence,
+            "notes": verification_notes,
+            "completion_photo_path": url_path,
+            "message": f"Issue marked as {new_status}. AI verification: {verification_result}"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing completion: {str(e)}")
+
+
+@router.get("/user/{user_id}/stats")
+async def get_user_stats(user_id: int, db: Session = Depends(get_db)):
+    """Get user gamification stats and badges"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Calculate additional stats
+    total_upvotes_received = db.query(func.sum(Issue.upvotes)).filter(Issue.reporter_id == user_id).scalar() or 0
+
+    return {
+        "civic_points": user.civic_points,
+        "reputation_score": user.reputation_score,
+        "total_reports": user.total_reports,
+        "valid_reports": user.valid_reports,
+        "fake_reports": user.fake_reports,
+        "badges": json.loads(user.badges or "[]"),
+        "upvotes_received": total_upvotes_received,
+        "accuracy_rate": (user.valid_reports / max(user.total_reports, 1)) * 100
+    }

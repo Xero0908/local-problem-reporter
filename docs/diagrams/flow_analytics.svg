@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <style>text{font-family:'Times New Roman', serif; font-size:13px}</style>
+  <text x="10" y="20" font-weight="700">Flowchart — Analytics Pipeline</text>
+
+  <rect x="340" y="60" width="220" height="50" rx="6" fill="#e8f0ff" stroke="#667eea"/>
+  <text x="450" y="95" text-anchor="middle">Collect Issue Data</text>
+
+  <rect x="340" y="140" width="220" height="50" rx="6" fill="#fff7e6" stroke="#f57c00"/>
+  <text x="450" y="175" text-anchor="middle">Preprocess & Clean</text>
+
+  <polygon points="450,260 490,300 450,340 410,300" fill="#fff" stroke="#333"/>
+  <text x="450" y="310" text-anchor="middle">Valid?</text>
+
+  <rect x="340" y="420" width="220" height="50" rx="6" fill="#f3e5f5" stroke="#7b1fa2"/>
+  <text x="450" y="455" text-anchor="middle">Feature Extraction</text>
+
+  <rect x="340" y="520" width="220" height="50" rx="6" fill="#e8f5e9" stroke="#27ae60"/>
+  <text x="450" y="555" text-anchor="middle">Aggregate & Store Stats</text>
+
+  <rect x="600" y="300" width="220" height="50" rx="6" fill="#fff0f0" stroke="#e74c3c"/>
+  <text x="710" y="335" text-anchor="middle" fill="#e74c3c">Invalid data — Log / Clean / Flag</text>
+
+  <defs>
+    <marker id="arrA" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333" />
+    </marker>
+  </defs>
+
+  <line x1="450" y1="110" x2="450" y2="140" stroke="#333" stroke-width="2" marker-end="url(#arrA)"/>
+  <line x1="450" y1="190" x2="450" y2="260" stroke="#333" stroke-width="2" marker-end="url(#arrA)"/>
+  <line x1="450" y1="340" x2="450" y2="420" stroke="#333" stroke-width="2" marker-end="url(#arrA)"/>
+  <line x1="450" y1="470" x2="450" y2="520" stroke="#333" stroke-width="2" marker-end="url(#arrA)"/>
+
+  <line x1="410" y1="300" x2="600" y2="300" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrA)"/>
+  <line x1="600" y1="300" x2="600" y2="320" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrA)"/>
+  <text x="520" y="290" font-size="12" text-anchor="middle" fill="#e74c3c">No</text>
+
+  <text x="460" y="320" font-size="12" text-anchor="middle">Yes</text>
+
+  <text x="10" y="685" font-size="12">Notes: invalid data is isolated and cleaned; valid data enters feature extraction, scoring, and aggregation.</text>
+</svg>

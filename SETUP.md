@@ -84,15 +84,86 @@ python
 >>> exit()
 ```
 
-### Step 6: Download YOLOv5 Model
+### Step 7: Configure Email (Required for Password Reset)
 
-First time YOLOv5 runs, it downloads ~100MB model. Pre-download to avoid delays:
+**⚠️ IMPORTANT:** Email configuration is required for the password reset feature to work.
+
+Create a `.env` file in the backend directory with your email settings:
 
 ```bash
-python -c "import yolov5; yolov5.load('yolov5s')"
+# In backend/.env
+EMAIL_SMTP_USERNAME=your-email@gmail.com
+EMAIL_SMTP_PASSWORD=your-app-password-or-key
+EMAIL_SMTP_SERVER=smtp.gmail.com
+EMAIL_SMTP_PORT=587
+DEBUG=True
+PORT=8000
 ```
 
-### Step 7: Start Backend Server
+#### For Gmail:
+1. **Enable 2-Factor Authentication** on your Google account
+2. **Generate an App Password**:
+   - Go to https://myaccount.google.com/security
+   - Click "2-Step Verification" → "App passwords"
+   - Select "Mail" and "Other (custom name)"
+   - Enter "Local Problem Reporter" as the name
+   - Copy the 16-character password
+3. Use your Gmail address as `EMAIL_SMTP_USERNAME`
+4. Use the App Password as `EMAIL_SMTP_PASSWORD`
+
+#### For Outlook/Hotmail:
+```bash
+EMAIL_SMTP_USERNAME=your-email@outlook.com
+EMAIL_SMTP_PASSWORD=your-password
+EMAIL_SMTP_SERVER=smtp-mail.outlook.com
+EMAIL_SMTP_PORT=587
+```
+
+#### For Yahoo:
+```bash
+EMAIL_SMTP_USERNAME=your-email@yahoo.com
+EMAIL_SMTP_PASSWORD=your-app-password
+EMAIL_SMTP_SERVER=smtp.mail.yahoo.com
+EMAIL_SMTP_PORT=587
+```
+
+#### For Custom SMTP:
+Replace the values above with your email provider's SMTP settings.
+
+**Test Email Configuration:**
+```bash
+# Start the backend
+python run.py
+
+# Test password reset in another terminal
+curl -X POST http://localhost:8000/api/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"your-test-email@example.com"}'
+```
+
+You should receive a temporary password email if configured correctly.
+
+### Step 8: Configure Frontend API URL
+
+For production builds, create a `.env` file in the frontend directory:
+
+```bash
+# In frontend/.env
+REACT_APP_API_URL=http://localhost:8000
+```
+
+For production deployment, change this to your Railway backend URL:
+```bash
+REACT_APP_API_URL=https://your-railway-backend.railway.app
+```
+
+**Note:** If your frontend runs on a different port (e.g., 3001), update the backend's CORS origins:
+```bash
+# In backend/.env
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+```
+
+### Step 9: Start Backend Server
 
 ```bash
 python run.py
@@ -205,23 +276,36 @@ Expected result:
 ### 3. Try Authority Mode
 
 - Click "Authority Mode" button in nav
-- New tabs appear: "Dashboard" and "Analytics"
+- New tabs appear: "Dashboard", "Duplicates", and "Analytics"
 - Visit Dashboard to see statistics
 - Select an issue and update status
 
-### 4. Database Check
+**Authority Account:**
+- Email: `admin@authority.com`
+- Password: `admin123`
+- This account is created automatically on first startup
 
-Backend auto-creates `backend/problems.db` file. To inspect:
+### 4. Test Duplicate Management
 
-```bash
-# Install sqlite3 if needed: pip install sqlite3
-sqlite3 backend/problems.db
+**Delete buttons** only appear for duplicate issues (marked by AI as duplicates).
 
-# Inside sqlite:
-.tables                 # List tables
-SELECT COUNT(*) FROM issues;  # Count issues
-.quit                   # Exit
-```
+To test duplicate management:
+1. Report several similar issues in the same location
+2. AI will automatically detect and mark duplicates
+3. Login as authority (`admin@authority.com`)
+4. Visit "Duplicates" page to manage duplicate groups
+5. Select which duplicates to keep/delete
+
+**Note:** If no duplicates exist, delete buttons won't appear on regular issues.
+
+### 5. Test Password Reset
+
+1. Go to login page
+2. Click "Forgot Password?"
+3. Enter your email address
+4. Check your email for temporary password
+5. Use temporary password to login
+6. Change password in account settings (if implemented)
 
 ---
 

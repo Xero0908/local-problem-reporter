@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 import LocationDisplay from '../components/LocationDisplay';
 
 
@@ -23,10 +23,10 @@ function IssueDetailPage() {
   const fetchIssueDetail = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/issues/${id}`);
+      const response = await api.get(`/api/issues/${id}`);
       setIssue(response.data);
       setError('');
-      
+
       // Check if user has voted (use appropriate vote type based on status)
       checkUserUpvote(response.data.id, response.data.status);
     } catch (err) {
@@ -44,7 +44,7 @@ function IssueDetailPage() {
     try {
       // Use satisfaction vote for resolved, priority for others
       const voteType = status === 'resolved' ? 'satisfaction' : 'priority';
-      const response = await axios.get(`/api/issues/${issueId}/has-upvoted`, {
+      const response = await api.get(`/api/issues/${issueId}/has-upvoted`, {
         params: { token, vote_type: voteType }
       });
       setUserHasUpvoted(response.data.has_upvoted);
@@ -63,7 +63,7 @@ function IssueDetailPage() {
     setUpdating(true);
     try {
       const token = localStorage.getItem('authToken');
-      await axios.patch(
+      await api.patch(
         `/api/issues/${id}/status`,
         {},
         {
@@ -92,7 +92,7 @@ function IssueDetailPage() {
       try {
         const token = localStorage.getItem('authToken');
         const userId = localStorage.getItem('userId');
-        await axios.delete(
+        await api.delete(
           `/api/issues/${id}/delete`,
           {
             params: {
@@ -121,10 +121,10 @@ function IssueDetailPage() {
       // Use satisfaction vote for resolved, priority for others
       const voteType = issue.status === 'resolved' ? 'satisfaction' : 'priority';
 
-      await axios.post(`/api/issues/${issue.id}/upvote`, {}, {
+      await api.post(`/api/issues/${issue.id}/upvote`, {}, {
         params: { token, vote_type: voteType }
       });
-      
+
       setUserHasUpvoted(true);
       fetchIssueDetail();
     } catch (err) {
@@ -199,7 +199,7 @@ function IssueDetailPage() {
 
               <div className="detail-row">
                 <label>Priority Level:</label>
-                <span style={{ 
+                <span style={{
                   fontWeight: '600',
                   color: {
                     'critical': '#e74c3c',
@@ -267,9 +267,9 @@ function IssueDetailPage() {
           {issue.image_path && (
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ marginBottom: '1rem', color: '#667eea' }}>📷 Uploaded Image</h3>
-              <img 
-                src={issue.image_path} 
-                alt="Issue" 
+              <img
+                src={issue.image_path}
+                alt="Issue"
                 style={{
                   maxWidth: '100%',
                   maxHeight: '500px',
@@ -322,7 +322,7 @@ function IssueDetailPage() {
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                       <div>
-                        <span style={{ 
+                        <span style={{
                           background: '#667eea',
                           color: 'white',
                           padding: '0.25rem 0.75rem',

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 
 
 function LoginPage() {
@@ -12,15 +12,32 @@ function LoginPage() {
     email: '',
     password: '',
     username: '',
-    fullName: ''
+    fullName: '',
+    security_question: '',
+    security_answer: ''
   });
+  const [securityNote, setSecurityNote] = useState('');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: value || ''  // Ensure value is always a string
     }));
+  };
+
+  const fetchSecurityQuestion = async () => {
+    try {
+      const response = await api.get('/api/auth/random-security-question');
+      setFormData(prev => ({
+        ...prev,
+        security_question: response.data.question,
+        security_answer: ''
+      }));
+      setSecurityNote('');
+    } catch (err) {
+      console.error('Error fetching security question:', err);
+    }
   };
 
   const handleLogin = async (e) => {
@@ -29,7 +46,7 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await axios.post('/api/auth/login', {
+      const response = await api.post('/api/auth/login', {
         email: formData.email,
         password: formData.password
       });
@@ -56,8 +73,8 @@ function LoginPage() {
     e.preventDefault();
     setError('');
 
-    if (!formData.email || !formData.password || !formData.username || !formData.fullName) {
-      setError('Please fill in all fields');
+    if (!formData.email || !formData.password || !formData.username || !formData.fullName || !formData.security_answer) {
+      setError('Please fill in all fields including security answer');
       return;
     }
 
@@ -66,14 +83,21 @@ function LoginPage() {
       return;
     }
 
+    if (formData.security_answer.trim().length === 0) {
+      setError('Please provide an answer to the security question');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await axios.post('/api/auth/register', {
+      const response = await api.post('/api/auth/register', {
         email: formData.email,
         username: formData.username,
         full_name: formData.fullName,
-        password: formData.password
+        password: formData.password,
+        security_question: formData.security_question,
+        security_answer: formData.security_answer
       });
 
       // Store token and user info
@@ -200,6 +224,81 @@ function LoginPage() {
                   }}
                 />
               </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <label style={{ color: '#333', fontWeight: '500' }}>
+                    Security Question
+                  </label>
+                  <button
+                    type="button"
+                    onClick={fetchSecurityQuestion}
+                    style={{
+                      background: '#667eea',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '4px',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Get Question
+                  </button>
+                </div>
+                <div style={{
+                  padding: '0.75rem',
+                  background: '#f0f4ff',
+                  border: '1px solid #667eea',
+                  borderRadius: '6px',
+                  fontSize: '0.95rem',
+                  color: '#333',
+                  minHeight: '2.5rem',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                  {formData.security_question || 'Click "Get Question" to load a security question'}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: '#333', fontWeight: '500' }}>
+                  Security Answer (1 word)
+                </label>
+                <input
+                  type="text"
+                  name="security_answer"
+                  value={formData.security_answer || ''}
+                  onChange={(e) => {
+                    const value = e.target.value || '';
+                    handleInputChange(e);
+                    setSecurityNote(value ? `📝 Remember: "${value}"` : '');
+                  }}
+                  placeholder="Your answer (keep it simple, 1 word)"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    fontSize: '1rem',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                {securityNote && (
+                  <div style={{
+                    marginTop: '0.5rem',
+                    padding: '0.5rem',
+                    background: '#fff3cd',
+                    border: '1px solid #ffc107',
+                    color: '#856404',
+                    borderRadius: '4px',
+                    fontSize: '0.9rem'
+                  }}>
+                    {securityNote}
+                  </div>
+                )}
+              </div>
             </>
           )}
 
@@ -227,7 +326,7 @@ function LoginPage() {
               <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
                 <button
                   type="button"
-                  onClick={() => alert('Please contact support for password reset.')}
+                  onClick={() => navigate('/forgot-password')}
                   style={{
                     background: 'none',
                     border: 'none',

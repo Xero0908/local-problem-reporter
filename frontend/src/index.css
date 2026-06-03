@@ -6,7 +6,7 @@
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f5f5f5;
+  background-color: #fbcccc;
   color: #333;
 }
 
@@ -18,7 +18,7 @@ body {
 
 /* Navigation Bar */
 .navbar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a0f6cf 0%, #ac85d2 100%);
   color: white;
   padding: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -74,7 +74,7 @@ body {
 }
 
 .nav-toggle-btn:hover {
-  background: white;
+  background: rgb(238, 207, 207);
   color: #667eea;
 }
 
@@ -93,7 +93,7 @@ body {
 }
 
 .hero {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #8af7fb 0%, #bc92e7 100%);
   color: white;
   padding: 4rem 2rem;
   border-radius: 12px;
@@ -132,12 +132,12 @@ body {
 }
 
 .btn-primary {
-  background-color: #667eea;
+  background-color: #8da0f5;
   color: white;
 }
 
 .btn-primary:hover {
-  background-color: #5567d8;
+  background-color: #8c99ef;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
@@ -268,7 +268,7 @@ body {
 
 /* Report Form */
 .report-form {
-  background: white;
+  background: rgb(250, 194, 194);
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -718,6 +718,7 @@ body {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }

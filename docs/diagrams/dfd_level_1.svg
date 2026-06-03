@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <style>text{font-family:'Times New Roman', serif; font-size:13px}</style>
+  <text x="10" y="20" font-weight="700">DFD Level 1 — Overview Diagram</text>
+
+  <rect x="30" y="80" width="140" height="60" rx="6" fill="#e8f0ff" stroke="#667eea"/>
+  <text x="100" y="115" text-anchor="middle">Citizen</text>
+
+  <rect x="260" y="70" width="200" height="80" rx="8" fill="#fff7e6" stroke="#f57c00"/>
+  <text x="360" y="110" text-anchor="middle">Report Service</text>
+
+  <rect x="520" y="70" width="200" height="80" rx="8" fill="#fff7e6" stroke="#f57c00"/>
+  <text x="620" y="110" text-anchor="middle">Validation Service</text>
+
+  <rect x="520" y="320" width="200" height="80" rx="8" fill="#e8f5e9" stroke="#27ae60"/>
+  <text x="620" y="360" text-anchor="middle">Admin Dashboard</text>
+
+  <rect x="780" y="70" width="180" height="100" rx="8" fill="#f3e5f5" stroke="#7b1fa2"/>
+  <text x="870" y="120" text-anchor="middle">Issue DB</text>
+
+  <defs>
+    <marker id="arrow2" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+  </defs>
+
+  <line x1="170" y1="110" x2="260" y2="110" stroke="#333" stroke-width="2" marker-end="url(#arrow2)"/>
+  <text x="215" y="95" font-size="12" text-anchor="middle">Submit issue</text>
+
+  <line x1="460" y1="110" x2="520" y2="110" stroke="#333" stroke-width="2" marker-end="url(#arrow2)"/>
+  <text x="490" y="95" font-size="12" text-anchor="middle">Validate request</text>
+
+  <line x1="720" y1="110" x2="780" y2="110" stroke="#333" stroke-width="2" marker-end="url(#arrow2)"/>
+  <text x="750" y="95" font-size="12" text-anchor="middle">Store issue</text>
+
+  <line x1="620" y1="150" x2="460" y2="150" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrow2)" stroke-dasharray="4 3"/>
+  <text x="540" y="170" font-size="12" text-anchor="middle" fill="#e74c3c">Validation error</text>
+
+  <path d="M870 170 C 930 170 930 320 620 320" fill="none" stroke="#333" stroke-width="2" marker-end="url(#arrow2)"/>
+  <text x="760" y="250" font-size="12" text-anchor="middle">Issue records</text>
+
+  <line x1="520" y1="360" x2="460" y2="360" stroke="#333" stroke-width="2" marker-end="url(#arrow2)"/>
+  <text x="490" y="345" font-size="12" text-anchor="middle">Admin request</text>
+
+  <text x="10" y="690" font-size="12">Notes: Level 1 shows major system functions, the issue database, and the data flow between citizens, processing services, and city administrators.</text>
+</svg>

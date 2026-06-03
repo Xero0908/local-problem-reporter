@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+﻿import React, { useState, useEffect } from 'react';
+import api from '../utils/api';
+import { jwtDecode } from 'jwt-decode';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,10 +11,10 @@ import {
   Title,
   Tooltip,
   Legend,
-  ArcElement
+  ArcElement,
+  Filler
 } from 'chart.js';
 import { Line, Bar, Pie } from 'react-chartjs-2';
-
 
 ChartJS.register(
   CategoryScale,
@@ -22,25 +23,28 @@ ChartJS.register(
   LineElement,
   BarElement,
   ArcElement,
+  Filler,
   Title,
   Tooltip,
   Legend
 );
 
-
 function DashboardPage() {
   const [dashboardData, setDashboardData] = useState(null);
+  const [userStats, setUserStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showGamification, setShowGamification] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchUserStats();
   }, []);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/analytics/dashboard');
+      const response = await api.get('/api/analytics/dashboard');
       setDashboardData(response.data);
       setError('');
     } catch (err) {
@@ -48,6 +52,20 @@ function DashboardPage() {
       setError(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserStats = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        const decoded = jwtDecode(token);
+        const userId = decoded.sub;
+        const response = await api.get(`/api/issues/user/${userId}/stats`);
+        setUserStats(response.data);
+      }
+    } catch (err) {
+      console.log('Could not load user stats:', err);
     }
   };
 
@@ -71,15 +89,22 @@ function DashboardPage() {
     );
   }
 
-  // Prepare data for charts
   const priorityLabels = Object.keys(dashboardData.priority_distribution || {});
   const priorityValues = Object.values(dashboardData.priority_distribution || {});
-
   const typeLabels = Object.keys(dashboardData.issue_types || {});
   const typeValues = Object.values(dashboardData.issue_types || {});
+  const statusLabels = Object.keys(dashboardData.issues_by_status || {});
+  const statusValues = Object.values(dashboardData.issues_by_status || {});
 
-  const statusLabels = Object.keys(dashboardData.status_distribution || {});
-  const statusValues = Object.values(dashboardData.status_distribution || {});
+  const recentIssueCountsByDate = (dashboardData.recent_issues || []).reduce((acc, item) => {
+    const date = item.created_at?.slice(0, 10);
+    if (date) {
+      acc[date] = (acc[date] || 0) + 1;
+    }
+    return acc;
+  }, {});
+  const recentIssueLabels = Object.keys(recentIssueCountsByDate);
+  const recentIssueValues = Object.values(recentIssueCountsByDate);
 
   const priorityColors = {
     critical: '#e74c3c',
@@ -106,11 +131,54 @@ function DashboardPage() {
 
   return (
     <div className="dashboard-page">
-      <h1 style={{ marginBottom: '2rem' }}>📊 Authority Dashboard</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h1>📊 Authority Dashboard</h1>
+        <button
+          onClick={() => setShowGamification(!showGamification)}
+          style={{
+            background: userStats ? (showGamification ? '#e74c3c' : '#27ae60') : '#3498db',
+            color: 'white',
+            border: 'none',
+            padding: '14px 28px',
+            borderRadius: '10px',
+            fontSize: '1.1rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+            transition: 'all 0.3s ease',
+            transform: showGamification ? 'scale(1.05)' : 'scale(1)',
+            position: 'relative'
+          }}
+        >
+          <span style={{ fontSize: '1.2rem' }}>🏆</span>
+          {showGamification ? 'Hide' : 'Show'} My Civic Impact
+          {userStats && !showGamification && (
+            <span style={{
+              background: '#fff',
+              color: '#27ae60',
+              borderRadius: '50%',
+              width: '20px',
+              height: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.8rem',
+              fontWeight: 'bold',
+              position: 'absolute',
+              top: '-5px',
+              right: '-5px'
+            }}>
+              {userStats.civic_points}
+            </span>
+          )}
+        </button>
+      </div>
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      {/* Stats Grid */}
       <div className="stats-grid">
         <div className="stat-card critical">
           <h3>Critical Issues</h3>
@@ -150,9 +218,149 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Charts */}
+      {userStats && showGamification && (
+        <div style={{
+          background: 'white',
+          padding: '2rem',
+          borderRadius: '12px',
+          marginBottom: '2rem',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <h2 style={{ marginBottom: '1.5rem', color: '#333' }}>🏆 Your Civic Impact</h2>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <div style={{
+              textAlign: 'center',
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              borderRadius: '12px'
+            }}>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {userStats.civic_points}
+              </div>
+              <div style={{ fontSize: '1.1rem' }}>Civic Points</div>
+            </div>
+
+            <div style={{
+              textAlign: 'center',
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+              color: 'white',
+              borderRadius: '12px'
+            }}>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {(userStats.reputation_score * 100).toFixed(0)}%
+              </div>
+              <div style={{ fontSize: '1.1rem' }}>Reputation Score</div>
+            </div>
+
+            <div style={{
+              textAlign: 'center',
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              color: 'white',
+              borderRadius: '12px'
+            }}>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {userStats.valid_reports}
+              </div>
+              <div style={{ fontSize: '1.1rem' }}>Valid Reports</div>
+            </div>
+
+            <div style={{
+              textAlign: 'center',
+              padding: '1.5rem',
+              background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+              color: 'white',
+              borderRadius: '12px'
+            }}>
+              <div style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                {userStats.accuracy_rate.toFixed(0)}%
+              </div>
+              <div style={{ fontSize: '1.1rem' }}>Accuracy Rate</div>
+            </div>
+          </div>
+
+          {userStats.badges && userStats.badges.length > 0 && (
+            <div>
+              <h3 style={{ marginBottom: '1rem', color: '#555' }}>🏅 Earned Badges</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                {userStats.badges.map((badge, index) => (
+                  <div key={index} style={{
+                    background: '#f8f9fa',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '20px',
+                    border: '2px solid #667eea',
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold',
+                    color: '#667eea'
+                  }}>
+                    {badge}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: '1rem',
+            marginTop: '1.5rem',
+            paddingTop: '1.5rem',
+            borderTop: '1px solid #eee'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#27ae60' }}>
+                {userStats.total_reports}
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#666' }}>Total Reports</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#e74c3c' }}>
+                {userStats.fake_reports}
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#666' }}>Fake Reports</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f39c12' }}>
+                {userStats.upvotes_received}
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#666' }}>Upvotes Received</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGamification && !userStats && (
+        <div style={{
+          background: 'white',
+          padding: '2rem',
+          borderRadius: '12px',
+          marginBottom: '2rem',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          textAlign: 'center'
+        }}>
+          <h2 style={{ marginBottom: '1rem', color: '#333' }}>🏆 Your Civic Impact</h2>
+          <p style={{ color: '#666', fontSize: '1.1rem' }}>
+            Loading your gamification stats... Please make sure you're logged in.
+          </p>
+          <div style={{ marginTop: '1rem' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔄</div>
+            <p style={{ color: '#999', fontSize: '0.9rem' }}>
+              If stats don't load, try refreshing the page or logging in again.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
-        {/* Priority Distribution */}
         <div className="chart-container">
           <h3>Issues by Priority Level</h3>
           <Pie
@@ -160,149 +368,99 @@ function DashboardPage() {
               labels: priorityLabels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
               datasets: [{
                 data: priorityValues,
-                backgroundColor: priorityLabels.map(l => priorityColors[l] || '#999'),
-                borderColor: '#fff',
-                borderWidth: 2
+                backgroundColor: priorityLabels.map(label => priorityColors[label] || '#95a5a6'),
+                borderWidth: 2,
+                borderColor: '#fff'
               }]
             }}
             options={{
               responsive: true,
               plugins: {
-                legend: {
-                  position: 'bottom'
+                legend: { position: 'bottom' },
+                tooltip: {
+                  callbacks: {
+                    label: (context) => `${context.label}: ${context.parsed}%`
+                  }
                 }
               }
             }}
           />
         </div>
 
-        {/* Type Distribution */}
         <div className="chart-container">
           <h3>Issues by Type</h3>
           <Bar
             data={{
-              labels: typeLabels.map(t => t.replace(/_/g, ' ')),
+              labels: typeLabels.map(l => l.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())),
               datasets: [{
                 label: 'Count',
                 data: typeValues,
-                backgroundColor: typeColors,
-                borderColor: '#fff',
-                borderWidth: 1
+                backgroundColor: typeColors.slice(0, typeLabels.length),
+                borderRadius: 4
               }]
             }}
             options={{
               responsive: true,
-              indexAxis: 'y',
+              scales: {
+                y: { beginAtZero: true }
+              },
               plugins: {
-                legend: {
-                  display: false
+                legend: { display: false }
+              }
+            }}
+          />
+        </div>
+
+        <div className="chart-container">
+          <h3>Issues by Status</h3>
+          <Pie
+            data={{
+              labels: statusLabels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+              datasets: [{
+                data: statusValues,
+                backgroundColor: statusLabels.map(label => statusColors[label] || '#95a5a6'),
+                borderWidth: 2,
+                borderColor: '#fff'
+              }]
+            }}
+            options={{
+              responsive: true,
+              plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                  callbacks: {
+                    label: (context) => `${context.label}: ${context.parsed}%`
+                  }
                 }
+              }
+            }}
+          />
+        </div>
+
+        <div className="chart-container">
+          <h3>Issue Trends (Recent Reports)</h3>
+          <Line
+            data={{
+              labels: recentIssueLabels,
+              datasets: [{
+                label: 'Recent Reports',
+                data: recentIssueValues,
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                tension: 0.4,
+                fill: true
+              }]
+            }}
+            options={{
+              responsive: true,
+              scales: {
+                y: { beginAtZero: true }
               }
             }}
           />
         </div>
       </div>
 
-      {/* Status Distribution */}
-      <div className="chart-container" style={{ marginBottom: '2rem' }}>
-        <h3>Issues by Status</h3>
-        <Bar
-          data={{
-            labels: statusLabels.map(s => s.charAt(0).toUpperCase() + s.slice(1)),
-            datasets: [{
-              label: 'Count',
-              data: statusValues,
-              backgroundColor: statusLabels.map(s => statusColors[s] || '#999'),
-              borderColor: '#fff',
-              borderWidth: 1
-            }]
-          }}
-          options={{
-            responsive: true,
-            plugins: {
-              legend: {
-                display: false
-              }
-            }
-          }}
-        />
-      </div>
-
-      {/* Recent Issues */}
-      <div className="chart-container">
-        <h3>Recent Issues</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Title</th>
-                <th>Type</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Upvotes</th>
-                <th>Reported</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dashboardData.recent_issues?.map(issue => (
-                <tr key={issue.id}>
-                  <td>#{issue.id}</td>
-                  <td>{issue.title}</td>
-                  <td>{issue.issue_type}</td>
-                  <td>
-                    <span style={{
-                      fontWeight: '600',
-                      color: {
-                        'critical': '#e74c3c',
-                        'high': '#e67e22',
-                        'medium': '#f39c12',
-                        'low': '#27ae60'
-                      }[issue.priority_level]
-                    }}>
-                      {issue.priority_level}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`issue-status status-${issue.status}`}>
-                      {issue.status}
-                    </span>
-                  </td>
-                  <td>{issue.upvotes}</td>
-                  <td>{new Date(issue.created_at).toLocaleDateString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Top Locations */}
-      {dashboardData.top_locations && dashboardData.top_locations.length > 0 && (
-        <div className="chart-container" style={{ marginTop: '2rem' }}>
-          <h3>Top Locations by Issue Count</h3>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Location</th>
-                <th>Issue Count</th>
-                <th>Average Priority</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dashboardData.top_locations.map((loc, idx) => (
-                <tr key={idx}>
-                  <td>{loc.location}</td>
-                  <td><strong>{loc.issue_count}</strong></td>
-                  <td>{loc.avg_priority.toFixed(1)}/100</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Action Buttons */}
       <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
         <button
           onClick={fetchDashboardData}

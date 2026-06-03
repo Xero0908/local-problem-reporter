@@ -134,19 +134,31 @@ class InfrastructureDetector:
         return green_ratio > 0.40 and blue_ratio < 0.20
     
     def _is_rock_debris(self, patch) -> bool:
-        """Detect rocks/debris: brown/gray + textured"""
+        """Detect rocks/debris: brown/gray + textured, avoid mistaking trees or water for debris."""
         r, g, b = patch[:,:,0].astype(float), patch[:,:,1].astype(float), patch[:,:,2].astype(float)
-        
-        # Brown/gray tone
-        avg_color = (r + g + b) / 3
-        brown = (r > 60) & (r < 180) & (g > 60) & (g < 150) & (b < 100)
-        
-        if brown.sum() < (patch.shape[0] * patch.shape[1] * 0.3):
+        total_pixels = patch.shape[0] * patch.shape[1]
+
+        # Reject vegetation-like or water-like patches
+        green_ratio = np.mean(g / (r + g + b + 1))
+        blue_ratio = np.mean(b / (r + g + b + 1))
+        if green_ratio > 0.35 or blue_ratio > 0.35:
             return False
-        
-        # Textured (variance)
+
+        # Brown/gray tone with more red than green or blue
+        avg_color = (r + g + b) / 3
+        brown = (
+            (r > 90) & (r < 200) &
+            (g > 60) & (g < 160) &
+            (b > 30) & (b < 140) &
+            (r > g) & (r > b)
+        )
+        brown_ratio = brown.sum() / total_pixels
+        if brown_ratio < 0.28:
+            return False
+
+        # Textured surface often indicates rock or debris
         variance = avg_color.std()
-        return variance > 20
+        return variance > 22
     
     def _deduplicate(self, objects: List[Dict]) -> List[Dict]:
         """Remove duplicate detections in nearby areas"""

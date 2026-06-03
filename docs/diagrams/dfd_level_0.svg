@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <style>text{font-family:'Times New Roman', serif; font-size:14px}</style>
+
+  <rect x="40" y="220" width="160" height="80" rx="8" fill="#e8f0ff" stroke="#667eea"/>
+  <text x="120" y="260" text-anchor="middle">Citizens</text>
+
+  <rect x="340" y="215" width="220" height="100" rx="16" fill="#fff7e6" stroke="#f57c00"/>
+  <text x="450" y="265" text-anchor="middle" font-size="16">Problem Reporter System</text>
+
+  <rect x="700" y="220" width="160" height="80" rx="8" fill="#e8f5e9" stroke="#27ae60"/>
+  <text x="780" y="260" text-anchor="middle">City Admin</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+  </defs>
+
+  <line x1="200" y1="260" x2="340" y2="260" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="270" y="245" font-size="12" text-anchor="middle">Submit issue</text>
+
+  <line x1="560" y1="260" x2="700" y2="260" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="630" y="245" font-size="12" text-anchor="middle">Notify issue</text>
+
+  <line x1="700" y1="300" x2="560" y2="300" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="630" y="315" font-size="12" text-anchor="middle">Admin request / update</text>
+
+  <line x1="200" y1="300" x2="340" y2="300" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="270" y="315" font-size="12" text-anchor="middle">Confirmation / error</text>
+
+  <text x="20" y="30" font-weight="700">DFD Level 0 — Context Diagram</text>
+  <text x="20" y="50" font-size="12">The whole system is shown as one process with external actors only; no internal databases are shown.</text>
+</svg>

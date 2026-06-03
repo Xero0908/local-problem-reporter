@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
 import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ReportPage from './pages/ReportPage';
 import DashboardPage from './pages/DashboardPage';
+import DuplicateIssuesPage from './pages/DuplicateIssuesPage';
 import IssuesListPage from './pages/IssuesListPage';
 import IssueDetailPage from './pages/IssueDetailPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ResolvedIssuesPage from './pages/ResolvedIssuesPage';
+import CivicImpactPage from './pages/CivicImpactPage';
 
 
 function App() {
@@ -27,43 +30,47 @@ function App() {
 
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      {!authToken ? (
-        <LoginPage />
-      ) : (
-        <div className="App">
-          <NavBar 
-            isAuthority={isAuthority} 
-            userEmail={userEmail}
-            onLogout={() => {
-              localStorage.removeItem('authToken');
-              localStorage.removeItem('userId');
-              localStorage.removeItem('userEmail');
-              localStorage.removeItem('isAuthority');
-              localStorage.removeItem('userRole');
-              window.location.href = '/';
-            }}
-          />
+      {authToken && (
+        <NavBar
+          isAuthority={isAuthority}
+          userEmail={userEmail}
+          onLogout={() => {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('userEmail');
+            localStorage.removeItem('isAuthority');
+            localStorage.removeItem('userRole');
+            window.location.href = '/';
+          }}
+        />
+      )}
 
-          <main className="main-content">
-            <Routes>
-              <Route path="/" element={<HomePage isAuthority={isAuthority} />} />
-              <Route path="/report" element={<ReportPage />} />
-              <Route path="/issues" element={<IssuesListPage />} />
-              <Route path="/resolved" element={<ResolvedIssuesPage />} />
-              <Route path="/issue/:id" element={<IssueDetailPage />} />
-              {isAuthority && (
-                <>
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
-                </>
-              )}
-            </Routes>
-          </main>
+      <Routes>
+        {/* Public routes - accessible without authentication */}
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/" element={!authToken ? <LoginPage /> : <HomePage isAuthority={isAuthority} />} />
+        
+        {/* Protected routes - only accessible with authentication */}
+        <Route path="/report" element={authToken ? <ReportPage /> : <LoginPage />} />
+        <Route path="/issues" element={authToken ? <IssuesListPage /> : <LoginPage />} />
+        <Route path="/resolved" element={authToken ? <ResolvedIssuesPage /> : <LoginPage />} />
+        <Route path="/civic-impact" element={authToken ? <CivicImpactPage /> : <LoginPage />} />
+        <Route path="/issue/:id" element={authToken ? <IssueDetailPage /> : <LoginPage />} />
+        
+        {/* Authority-only routes */}
+        {isAuthority && authToken && (
+          <>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/duplicates" element={<DuplicateIssuesPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+          </>
+        )}
+      </Routes>
 
-          <footer className="footer">
-            <p>&copy; 2024 Local Problem Reporter. AI-powered infrastructure issue tracking.</p>
-          </footer>
-        </div>
+      {authToken && (
+        <footer className="footer">
+          <p>&copy; 2024 Local Problem Reporter. AI-powered infrastructure issue tracking.</p>
+        </footer>
       )}
     </Router>
   );
@@ -90,10 +97,16 @@ function NavBar({ isAuthority, userEmail, onLogout }) {
           <li className="nav-item">
             <Link to="/resolved" className="nav-link">✅ Resolved</Link>
           </li>
+          <li className="nav-item">
+            <Link to="/civic-impact" className="nav-link">🏆 My Impact</Link>
+          </li>
           {isAuthority && (
             <>
               <li className="nav-item">
                 <Link to="/dashboard" className="nav-link">Dashboard</Link>
+              </li>
+              <li className="nav-item">
+                <Link to="/duplicates" className="nav-link">🔄 Duplicates</Link>
               </li>
               <li className="nav-item">
                 <Link to="/analytics" className="nav-link">Analytics</Link>
@@ -106,7 +119,7 @@ function NavBar({ isAuthority, userEmail, onLogout }) {
             </span>
           </li>
           <li className="nav-item">
-            <button 
+            <button
               onClick={onLogout}
               className="nav-toggle-btn"
               style={{ background: '#e74c3c', color: 'white' }}

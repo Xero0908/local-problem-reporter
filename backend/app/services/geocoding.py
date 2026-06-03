@@ -63,3 +63,59 @@ class GeocodingService:
         except Exception as e:
             print(f"Error in sync geocoding: {e}")
             return None
+
+    @staticmethod
+    async def search_address(
+        query: str,
+        limit: int = 5,
+        countrycodes: str = "in",
+        viewbox: Optional[str] = None,
+        bounded: bool = True
+    ) -> list:
+        """Search for addresses using Nominatim forward geocoding."""
+        try:
+            url = f"{GeocodingService.BASE_URL}/search"
+            params = {
+                "q": query,
+                "format": "json",
+                "limit": limit,
+                "addressdetails": 1,
+                "countrycodes": countrycodes,
+            }
+            if viewbox:
+                params["viewbox"] = viewbox
+            if bounded is not None:
+                params["bounded"] = 1 if bounded else 0
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    url,
+                    params=params,
+                    headers={"User-Agent": "LocalProblemReporter/1.0"},
+                    timeout=5.0
+                )
+
+                if response.status_code == 200:
+                    return response.json()
+        except Exception as e:
+            print(f"Error in forward geocoding: {e}")
+        return []
+
+    @staticmethod
+    def search_address_sync(
+        query: str,
+        limit: int = 5,
+        countrycodes: str = "in",
+        viewbox: Optional[str] = None,
+        bounded: bool = True
+    ) -> list:
+        """Synchronous wrapper for forward geocoding."""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(
+                GeocodingService.search_address(query, limit, countrycodes, viewbox, bounded)
+            )
+        except Exception as e:
+            print(f"Error in sync forward geocoding: {e}")
+            return []

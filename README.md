@@ -1,10 +1,13 @@
 # 🚨 Local Problem Reporter - AI-Powered Infrastructure Issue Tracking
 
+> **⚡ QUICK START:** Ready to run? Check [QUICK-START.md](./QUICK-START.md) - get up and running in 1 minute!
+
 An intelligent platform where citizens can report local infrastructure issues (potholes, garbage, water leaks, traffic problems, landslides, etc.) with AI-powered categorization, automatic priority scoring, and a dashboard for authorities to respond efficiently.
 
 ## ✨ Features
 
 ### 🎯 Core Features
+
 - **AI Image Recognition**: Upload photos of issues - YOLOv5 detects and categorizes them automatically
 - **Smart Priority Scoring**: Issues are automatically prioritized based on:
   - Issue severity type
@@ -17,6 +20,7 @@ An intelligent platform where citizens can report local infrastructure issues (p
 - **Interactive Dashboard**: Authorities view, filter, and manage issues
 
 ### 📊 Authority Dashboard
+
 - **Statistics Overview**: Critical, high, medium, low priority counts
 - **Charts & Analytics**: Visual breakdown by type, status, and priority
 - **Status Management**: Update issue status (reported → investigating → resolved)
@@ -24,6 +28,7 @@ An intelligent platform where citizens can report local infrastructure issues (p
 - **CSV Export**: Download issue data for further analysis
 
 ### 🎨 Issue Detection Categories
+
 - 🛣️ **Road Damage** (potholes, cracks, asphalt damage)
 - ♻️ **Garbage/Litter** (bottles, trash, bags, plastic)
 - 💧 **Water Leaks** (puddles, flooding, wet areas)
@@ -73,6 +78,7 @@ local-problem-reporter/
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Python 3.8+
 - Node.js 14+
 - npm or yarn
@@ -80,6 +86,7 @@ local-problem-reporter/
 ### Backend Setup
 
 1. **Create Python virtual environment**:
+
 ```bash
 cd backend
 python -m venv venv
@@ -89,33 +96,39 @@ source venv/bin/activate  # On macOS/Linux
 ```
 
 2. **Install dependencies**:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 3. **Download YOLOv5 model** (first run will auto-download):
+
 ```bash
 python -c "import yolov5; yolov5.load('yolov5s')"
 ```
 
 4. **Run the backend server**:
+
 ```bash
 python run.py
 ```
 
 Server will start at `http://localhost:8000`
+
 - API docs: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
 ### Frontend Setup
 
 1. **Install dependencies**:
+
 ```bash
 cd frontend
 npm install
 ```
 
 2. **Start development server**:
+
 ```bash
 npm start
 ```
@@ -127,28 +140,34 @@ Frontend will open at `http://localhost:3000`
 ### Issue Management
 
 **Upload Issue**
+
 ```
 POST /api/issues/upload
 ```
+
 - Accepts multipart form data with image, title, description, location
 - Returns: issue details with AI detection results
 
 **Get All Issues**
+
 ```
 GET /api/issues/all?priority=high&status=reported&issue_type=road_damage
 ```
 
 **Get Issue Details**
+
 ```
 GET /api/issues/{issue_id}
 ```
 
 **Upvote Issue**
+
 ```
 POST /api/issues/{issue_id}/upvote
 ```
 
 **Update Issue Status** (Authority only)
+
 ```
 PATCH /api/issues/{issue_id}/status?new_status=investigating&notes=...
 ```
@@ -156,26 +175,31 @@ PATCH /api/issues/{issue_id}/status?new_status=investigating&notes=...
 ### Analytics
 
 **Dashboard Overview**
+
 ```
 GET /api/analytics/dashboard
 ```
 
 **Detailed Statistics by Type**
+
 ```
 GET /api/analytics/stats/by-type
 ```
 
 **Resolution Rate Statistics**
+
 ```
 GET /api/analytics/stats/resolution-rate
 ```
 
 **Priority Timeline**
+
 ```
 GET /api/analytics/stats/priority-timeline?days=30
 ```
 
 **Export to CSV**
+
 ```
 GET /api/analytics/export/csv
 ```
@@ -213,9 +237,11 @@ Final Score: 0-100
 ## 🗄️ Database Schema
 
 ### Users Table
+
 - id, email, username, full_name, is_authority, created_at
 
 ### Issues Table
+
 - id, reporter_id, title, description, issue_type, image_path
 - latitude, longitude, location_description
 - priority_score, priority_level, status
@@ -223,9 +249,11 @@ Final Score: 0-100
 - upvotes, created_at, updated_at, resolved_at
 
 ### IssueUpdate Table
+
 - id, issue_id, authority_id, status_update, notes, created_at
 
 ### Analytics Table
+
 - id, date, issue_type, count, avg_priority, resolution_rate
 
 ## 🔐 Security Considerations
@@ -242,6 +270,7 @@ Final Score: 0-100
 ### Adding New Issue Types
 
 Edit `backend/app/services/ai_detector.py`:
+
 ```python
 new_keywords = ['keyword1', 'keyword2']
 object_confidence['new_type'] = max(...)
@@ -250,6 +279,7 @@ object_confidence['new_type'] = max(...)
 ### Changing Priority Weights
 
 Edit `backend/app/services/priority_scorer.py`:
+
 ```python
 ISSUE_SEVERITY = {
     "your_type": 85,  # Adjust severity
@@ -259,6 +289,7 @@ ISSUE_SEVERITY = {
 ### Styling
 
 All CSS is in `frontend/src/index.css`. Customize colors by changing:
+
 ```css
 --primary-color: #667eea;
 --secondary-color: #764ba2;
@@ -310,20 +341,24 @@ All CSS is in `frontend/src/index.css`. Customize colors by changing:
 ## 🐛 Troubleshooting
 
 ### YOLOv5 Model Download Issues
+
 ```bash
 # Manual download
 python -c "import yolov5; model = yolov5.load('yolov5s')"
 ```
 
 ### CORS Errors
+
 - Update `backend/app/main.py` to restrict origin in production
 - Frontend proxy in `frontend/package.json` should match backend URL
 
 ### Database Errors
+
 - Delete `backend/problems.db` to reset database
 - Ensure `sqlite` is available (usually pre-installed with Python)
 
 ### Port Already in Use
+
 ```bash
 # Change backend port
 python -c "uvicorn app.main:app --port 8001"
@@ -339,6 +374,7 @@ MIT License - see LICENSE file for details
 ## 📞 Contact & Support
 
 For issues, questions, or suggestions:
+
 - GitHub Issues: [Create an issue]
 - Email: support@localproblemsreporter.xyz
 - Discord: [Join our community]
@@ -347,4 +383,4 @@ For issues, questions, or suggestions:
 
 **Made with ❤️ for better communities**
 
-*"Report it. We'll fix it. Together."*
+_"Report it. We'll fix it. Together."_

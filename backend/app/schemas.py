@@ -73,6 +73,9 @@ class IssueList(BaseModel):
     longitude: Optional[float] = None
     location_description: Optional[str] = None
     street_address: Optional[str] = None
+    is_duplicate: bool = False
+    duplicate_count: int = 1
+    duplicate_group_id: Optional[str] = None
 
     class Config:
         from_attributes = True

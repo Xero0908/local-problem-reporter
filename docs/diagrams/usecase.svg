@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <style>text{font-family:'Times New Roman', serif; font-size:13px}</style>
+  <text x="10" y="20" font-weight="700">Use Case Diagram</text>
+
+  <!-- Actors -->
+  <text x="40" y="110">Citizen</text>
+  <circle cx="60" cy="150" r="20" fill="#e8f0ff" stroke="#667eea"/>
+
+  <text x="40" y="220">City Admin</text>
+  <circle cx="60" cy="260" r="20" fill="#e8f5e9" stroke="#27ae60"/>
+
+  <!-- Use cases -->
+  <ellipse cx="400" cy="150" rx="150" ry="50" fill="#fff7e6" stroke="#f57c00"/>
+  <text x="400" y="150" text-anchor="middle">Report Issue</text>
+
+  <ellipse cx="400" cy="260" rx="150" ry="50" fill="#f3e5f5" stroke="#7b1fa2"/>
+  <text x="400" y="260" text-anchor="middle">Manage Issues</text>
+
+  <!-- Lines -->
+  <line x1="80" y1="150" x2="250" y2="150" stroke="#333"/>
+  <line x1="250" y1="150" x2="400" y2="150" stroke="#333"/>
+
+  <line x1="80" y1="260" x2="400" y2="260" stroke="#333"/>
+
+  <text x="10" y="340" font-size="12">Alternate flows: If validation fails the citizen corrects inputs; if admin rejects/requests more info, user is notified. Authentication required for some admin actions.</text>
+</svg>

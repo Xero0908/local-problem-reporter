@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 
 
 function IssuesListPage() {
@@ -8,6 +8,7 @@ function IssuesListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [userUpvotes, setUserUpvotes] = useState(new Set()); // Track upvoted issues
+  const isAuthority = localStorage.getItem('isAuthority') === 'true';
   const [filters, setFilters] = useState({
     priority: '',
     status: '',
@@ -38,7 +39,7 @@ function IssuesListPage() {
       params.append('page', page);
       params.append('per_page', issuesPerPage);
 
-      const response = await axios.get(`/api/issues/all?${params}`);
+      const response = await api.get(`/api/issues/all?${params}`);
       setIssues(response.data.issues || response.data);
       setTotalPages(response.data.total_pages || 1);
       setTotalIssues(response.data.total_issues || response.data.length);
@@ -60,10 +61,10 @@ function IssuesListPage() {
     if (!token) return;
 
     const upvotedIssues = new Set();
-    
+
     for (const issue of issues) {
       try {
-        const response = await axios.get(`/api/issues/${issue.id}/has-upvoted`, {
+        const response = await api.get(`/api/issues/${issue.id}/has-upvoted`, {
           params: { token, vote_type: 'priority' }
         });
         if (response.data.has_upvoted) {
@@ -73,7 +74,7 @@ function IssuesListPage() {
         // Ignore errors when checking upvotes
       }
     }
-    
+
     setUserUpvotes(upvotedIssues);
   };
 
@@ -117,17 +118,39 @@ function IssuesListPage() {
         return;
       }
 
-      const response = await axios.post(`/api/issues/${issueId}/upvote`, {}, {
+      const response = await api.post(`/api/issues/${issueId}/upvote`, {}, {
         params: { token, vote_type: 'priority' }
       });
-      
+
       // Add to upvoted set
       setUserUpvotes(prev => new Set(prev).add(issueId));
-      
+
       // Refresh issues
       fetchIssues();
     } catch (err) {
       const errorMessage = err.response?.data?.detail || 'Error upvoting issue';
+      setError(errorMessage);
+    }
+  };
+
+  const handleDeleteIssue = async (issueId) => {
+    if (!window.confirm('Are you sure you want to delete this issue? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const userId = localStorage.getItem('userId');
+
+      const response = await api.delete(`/api/issues/${issueId}/delete`, {
+        params: { token, user_id: userId }
+      });
+
+      setError(''); // Clear any previous errors
+      alert(response.data.message);
+      fetchIssues(); // Refresh the list
+    } catch (err) {
+      const errorMessage = err.response?.data?.detail || 'Error deleting issue';
       setError(errorMessage);
     }
   };
@@ -342,9 +365,9 @@ function IssuesListPage() {
                   borderRadius: '8px',
                   marginBottom: '1rem'
                 }}>
-                  <img 
-                    src={issue.image_path} 
-                    alt="Issue" 
+                  <img
+                    src={issue.image_path}
+                    alt="Issue"
                     style={{
                       width: '100%',
                       height: '100%',
@@ -370,20 +393,45 @@ function IssuesListPage() {
 
                 <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
                   <p><strong>Priority Score:</strong> {issue.priority_score.toFixed(1)}/100</p>
+                  {issue.is_duplicate && (
+                    <p style={{ color: '#dc3545', fontWeight: 'bold' }}>
+                      🔄 Duplicate Report ({issue.duplicate_count} reports merged)
+                    </p>
+                  )}
                 </div>
 
                 <div className="upvote-section">
                   <button
                     onClick={() => handleUpvote(issue.id)}
                     className="upvote-btn"
-                    disabled={userUpvotes.has(issue.id)}
+                    disabled={userUpvotes.has(issue.id) || issue.is_duplicate}
                     style={{
-                      opacity: userUpvotes.has(issue.id) ? 0.5 : 1,
-                      cursor: userUpvotes.has(issue.id) ? 'not-allowed' : 'pointer'
+                      opacity: userUpvotes.has(issue.id) || issue.is_duplicate ? 0.5 : 1,
+                      cursor: userUpvotes.has(issue.id) || issue.is_duplicate ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    {userUpvotes.has(issue.id) ? '✓ Priority Vote Added' : '🚀 Help Prioritize'} ({issue.upvotes})
+                    {userUpvotes.has(issue.id) ? '✓ Priority Vote Added' : issue.is_duplicate ? '🔄 Duplicate' : '🚀 Help Prioritize'} ({issue.upvotes})
                   </button>
+
+                  {isAuthority && issue.is_duplicate && (
+                    <button
+                      onClick={() => handleDeleteIssue(issue.id)}
+                      style={{
+                        background: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '500',
+                        marginLeft: '0.5rem',
+                        fontSize: '0.9rem'
+                      }}
+                    >
+                      🗑️ Delete Duplicate
+                    </button>
+                  )}
+
                   <Link
                     to={`/issue/${issue.id}`}
                     style={{

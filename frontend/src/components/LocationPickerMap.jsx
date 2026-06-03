@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -62,14 +63,20 @@ const LocationPickerMap = ({ onSelect, initialLocation, searchQuery }) => {
   // Update center when searchQuery changes (user types location)
   useEffect(() => {
     if (searchQuery && searchQuery.length > 3) {
-      // Try to geocode the search query
       const geocodeLocation = async () => {
         try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=5&countrycodes=in&viewbox=75.0,32.7,77.8,31.0&bounded=1`
-          );
-          const data = await response.json();
-          if (data && data.length > 0) {
+          const response = await axios.get('/api/geocode/search', {
+            params: {
+              q: searchQuery,
+              format: 'json',
+              limit: 5,
+              countrycodes: 'in',
+              viewbox: '75.0,32.7,77.8,31.0',
+              bounded: 1
+            }
+          });
+          const data = response.data || [];
+          if (data.length > 0) {
             const validResult = data.find((item) => {
               const lat = parseFloat(item.lat);
               const lon = parseFloat(item.lon);

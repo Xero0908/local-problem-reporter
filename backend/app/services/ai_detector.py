@@ -6,8 +6,8 @@ class AIIssueDetector:
     def __init__(self):
         """Initialize AI detector with basic CSV-based analysis only"""
         self.analyzer = SimpleImageAnalyzer()
-        print("✓ Initialized basic detector: CSV-based rules only")
-        print("⚠️  Advanced AI/ML features disabled for deployment compatibility")
+        print("Initialized basic detector: CSV-based rules only")
+        print("Advanced AI/ML features disabled for deployment compatibility")
 
     def detect_issue_type(self, image_path: str) -> Tuple[str, float, List[str]]:
         """

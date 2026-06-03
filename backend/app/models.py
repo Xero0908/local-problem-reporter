@@ -15,6 +15,18 @@ class User(Base):
     is_authority = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
+    # Gamification fields
+    civic_points = Column(Integer, default=0)
+    reputation_score = Column(Float, default=0.0)
+    badges = Column(String, default="[]")  # JSON array of earned badges
+    total_reports = Column(Integer, default=0)
+    valid_reports = Column(Integer, default=0)
+    fake_reports = Column(Integer, default=0)
+    
+    # Security question for password reset
+    security_question = Column(String, nullable=True)
+    security_answer = Column(String, nullable=True)  # Stored as lowercase for comparison
+    
     issues = relationship("Issue", back_populates="reporter")
 
 
@@ -42,6 +54,16 @@ class Issue(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     resolved_at = Column(DateTime, nullable=True)
     
+    # Duplicate detection fields
+    duplicate_group_id = Column(String, nullable=True, index=True)  # UUID for duplicate clusters
+    is_duplicate = Column(Boolean, default=False)
+    duplicate_count = Column(Integer, default=1)  # How many reports in this cluster
+    
+    # Completion verification fields
+    completion_verified = Column(Boolean, default=False)
+    completion_confidence = Column(Float, default=0.0)
+    completion_notes = Column(Text, nullable=True)
+    
     reporter = relationship("User", back_populates="issues")
     updates = relationship("IssueUpdate", back_populates="issue", cascade="all, delete-orphan")
 
@@ -55,6 +77,11 @@ class IssueUpdate(Base):
     status_update = Column(String)
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Completion verification fields
+    completion_photo_path = Column(String, nullable=True)
+    verification_result = Column(String, nullable=True)  # 'approved', 'rejected', 'pending'
+    verification_confidence = Column(Float, default=0.0)
     
     issue = relationship("Issue", back_populates="updates")
 

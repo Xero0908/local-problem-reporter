@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import api from '../utils/api';
 import axios from 'axios';
 import LocationPickerMap from '../components/LocationPickerMap';
 
@@ -101,7 +102,7 @@ function ReportPage() {
     }
 
     try {
-      const response = await axios.get(`https://nominatim.openstreetmap.org/search`, {
+      const response = await axios.get('/api/geocode/search', {
         params: {
           q: query,
           format: 'json',
@@ -262,6 +263,7 @@ function ReportPage() {
       form.append('longitude', parseFloat(formData.longitude));
       form.append('location_description', formData.location_description.trim());
       form.append('issue_type', formData.issue_type);
+      form.append('token', localStorage.getItem('authToken'));
 
       console.log('Submitting form data:', {
         title: formData.title,
@@ -272,7 +274,7 @@ function ReportPage() {
         issue_type: formData.issue_type
       });
 
-      const response = await axios.post('/api/issues/upload', form, {
+      const response = await api.post('/api/issues/upload', form, {
         headers: {
           'Content-Type': 'multipart/form-data'
         },
@@ -287,6 +289,14 @@ function ReportPage() {
         ` | 🎯 Detected: ${response.data.issue_type} (${(response.data.ai_confidence * 100).toFixed(0)}% confident)` :
         '';
       setSuccess(`✓ Issue reported successfully! ID: ${response.data.id}${confidenceText}`);
+
+      // Check if this is a duplicate and redirect authorities to duplicates page
+      if (response.data.is_duplicate && localStorage.getItem('isAuthority') === 'true') {
+        setTimeout(() => {
+          alert('This issue appears to be a duplicate. Redirecting to duplicates management page...');
+          window.location.href = '/duplicates';
+        }, 2000);
+      }
 
       // Reset form after success
       setTimeout(() => {
